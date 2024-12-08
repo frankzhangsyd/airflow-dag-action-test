@@ -1,0 +1,47 @@
+name: Validate Changed Airflow DAGs
+
+on:
+  pull_request:
+    branches:
+      - main
+# Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  jobs:
+  validate-dags:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+
+    - name: Get changed dags
+      id: changed-files-specific
+      uses: tj-actions/changed-files@v45
+      with:
+        files: airflow/dags/**    
+
+    - name: Copy changed dags to test folder
+      if: steps.changed-files-specific.outputs.any_changed == 'true'
+      env:
+        ALL_CHANGED_FILES: ${{ steps.changed-files-specific.outputs.all_changed_files }}
+      run: |
+        mkdir -p changed_dags
+        for file in ${ALL_CHANGED_FILES}; do
+          echo "Copying $file to changed_dags/"
+          cp $file changed_dags/
+        done
+        
+    - name: Validate DAGs
+      uses: frankzhangsyd/airflow-dag-action@master
+      with:
+        requirementsFile: requirements.txt
+        dagPaths: changed_dags
+        varFile: var.json
+        connFile:
+        pluginPaths:
+        loadExample:
+        accessToken: ${{ secrets.GITHUB_TOKEN }}
+        pythonVersion: 3.9
+        airflowVersion: 2.7.3
